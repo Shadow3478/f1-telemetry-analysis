@@ -19,3 +19,4 @@ pitwall-backend/data/fastf1-cache/
 
 # Logs
 *.log
+pitwall-backend/fastf1_cache/

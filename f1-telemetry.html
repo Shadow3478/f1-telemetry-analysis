@@ -64,8 +64,8 @@
   .dim { color: var(--text3); }
 
   /* PAGE SYSTEM */
-  .page { display: none; min-height: 100vh; animation: fadein 0.3s ease; }
-  .page.active { display: block; }
+  .page { display: none; min-height: 100vh; animation: fadein 0.3s ease; opacity: 0; }
+  .page.active { display: block; opacity: 1; }
   @keyframes fadein { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
   /* NAV */
@@ -1168,13 +1168,24 @@ async function apiGet(path) {
 }
 
 async function apiPost(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if(!res.ok) throw new Error(await apiErrorText(res));
-  return res.json();
+  const url = `${API_BASE}${path}`;
+  const payload = JSON.stringify(body);
+  console.log(`[PITWALL] POST ${url}`, body);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
+    });
+    console.log(`[PITWALL] POST ${url} => ${res.status}`);
+    if(!res.ok) throw new Error(await apiErrorText(res));
+    const data = await res.json();
+    console.log(`[PITWALL] POST ${url} response:`, data);
+    return data;
+  } catch (err) {
+    console.error(`[PITWALL] POST ${url} failed:`, err);
+    throw err;
+  }
 }
 
 async function apiErrorText(res) {
@@ -1202,6 +1213,22 @@ function htmlEscape(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function logDomNodeState(label, selector) {
+  const el = document.querySelector(selector);
+  const style = el ? window.getComputedStyle(el) : null;
+  console.log('[DOM]', document.getElementById('analysis'));
+  console.log('[DOM]', document.querySelector(selector));
+  console.log('[DOM STATE]', label, {
+    selector,
+    exists: !!el,
+    display: style ? style.display : null,
+    visibility: style ? style.visibility : null,
+    opacity: style ? style.opacity : null,
+    zIndex: style ? style.zIndex : null,
+    className: el ? el.className : null
+  });
+}
+
 // ===== STATE =====
 let currentPage = 'landing';
 let selectedRace = null;
@@ -1216,15 +1243,51 @@ let currentAnalysis = null;
 let currentJobId = null;
 
 // ===== NAVIGATION =====
+function enforceSingleActivePage(targetPageId) {
+  const pages = Array.from(document.querySelectorAll('.page'));
+  let chosen = null;
+  pages.forEach(p => {
+    const shouldBeActive = p.id === targetPageId;
+    p.classList.toggle('active', shouldBeActive);
+    if(shouldBeActive) chosen = p;
+  });
+  if(!chosen) {
+    console.error('[NAV] target page not found:', targetPageId);
+  }
+  const activePages = pages.filter(p => p.classList.contains('active'));
+  if(activePages.length !== 1) {
+    console.warn('[NAV] corrected multiple active pages', activePages.map(p => p.id));
+    pages.forEach(p => p.classList.remove('active'));
+    if(chosen) chosen.classList.add('active');
+  }
+}
+
 function goTo(page) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
+  const targetPageId = 'page-' + page;
+  enforceSingleActivePage(targetPageId);
+  let activePage = document.querySelector('.page.active')?.id || null;
+  console.log('[PAGE ACTIVE]', activePage);
+  const targetPage = document.getElementById(targetPageId);
+  if(!targetPage) {
+    console.error('[NAV] goTo() aborted: missing page element', targetPageId);
+    return;
+  }
+  enforceSingleActivePage(targetPageId);
+  activePage = document.querySelector('.page.active')?.id || null;
+  console.log('[PAGE ACTIVE]', activePage);
   currentPage = page;
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   window.scrollTo(0,0);
   if(page === 'selector') renderRaceGridApi();
   if(page === 'analysis') {
     document.getElementById('nav-analysis-link').style.display = 'block';
+    activePage = document.querySelector('.page.active')?.id || null;
+    console.log('[PAGE ACTIVE]', activePage);
+    logDomNodeState('analysis page container', '#page-analysis');
+    logDomNodeState('insights container', '#insight-list');
+    logDomNodeState('lap summary container', '#lap-summary-card');
+    logDomNodeState('delta chart container', '#delta-svg');
+    console.log('[TRACE] entering renderAnalysis');
     renderAnalysis();
   }
 }
@@ -1439,7 +1502,11 @@ function updateCompareBtn() {
 }
 
 async function runAnalysis() {
-  if(!selectedDriverA || !selectedDriverB || !selectedRace) return;
+  console.log('[PITWALL] runAnalysis() called', { selectedDriverA, selectedDriverB, selectedRace, selectedSession, currentYear });
+  if(!selectedDriverA || !selectedDriverB || !selectedRace) {
+    console.warn('[PITWALL] runAnalysis() aborted: missing selection', { selectedDriverA, selectedDriverB, selectedRace });
+    return;
+  }
   currentAnalysis = null;
   currentJobId = null;
   const loader = document.getElementById('loader');
@@ -1450,18 +1517,27 @@ async function runAnalysis() {
   loader.style.pointerEvents = 'all';
   bar.style.width = '8%';
   msg.textContent = 'submitting analysis job';
+
+  const requestBody = {
+    year: currentYear,
+    round: selectedRace.round,
+    session: selectedSession,
+    driver_a: selectedDriverA.code,
+    driver_b: selectedDriverB.code,
+    force_refresh: false
+  };
+  console.log('[PITWALL] Analysis request body:', JSON.stringify(requestBody));
+
   try {
-    const job = await apiPost('/analysis', {
-      year: currentYear,
-      round: selectedRace.round,
-      session: selectedSession,
-      driver_a: selectedDriverA.code,
-      driver_b: selectedDriverB.code,
-      force_refresh: false
-    });
+    const job = await apiPost('/analysis', requestBody);
+    console.log('[PITWALL] Job submitted:', job);
     currentJobId = job.job_id;
+    bar.style.width = '15%';
+    msg.textContent = 'job accepted — polling for results';
     const result = await pollAnalysis(job.job_id, bar, msg);
-    currentAnalysis = result;
+    console.log('[TRACE] pollAnalysis completed');
+    currentAnalysis = (result && (result.result || result.data)) ? (result.result || result.data) : result;
+    console.log('[TRACE] currentAnalysis assigned');
     bar.style.width = '100%';
     msg.textContent = 'ready';
     setTimeout(() => {
@@ -1470,14 +1546,15 @@ async function runAnalysis() {
       goTo('analysis');
     }, 250);
   } catch (err) {
+    console.error('[PITWALL] runAnalysis() failed:', err);
     apiOnline = false;
-    msg.textContent = 'backend offline - showing local demo';
+    msg.textContent = 'backend error - showing local demo';
     setTimeout(() => {
       loader.classList.add('hidden');
       loader.style.pointerEvents = 'none';
       currentAnalysis = null;
       goTo('analysis');
-      alert(`Could not reach ${API_BASE}.\n\nStart the backend with:\nuvicorn main:app --reload --port 8000\n\nShowing local demo data for now.`);
+      alert(`Analysis request failed: ${err.message}\n\nBackend: ${API_BASE}\nMake sure the backend is running:\n  uvicorn main:app --reload --port 8000\n\nShowing local demo data for now.`);
     }, 500);
   }
 }
@@ -1527,25 +1604,107 @@ function showLoader(cb) {
 
 // ===== ANALYSIS =====
 function renderAnalysisApi(result) {
+  console.log('[STEP 1] before trace insights count');
+  console.log('[TRACE] insights count', result?.insights?.length);
+  console.log('[STEP 1] after trace insights count');
+
+  console.log('[STEP 2] before trace charts present');
+  console.log('[TRACE] charts present', !!result?.charts);
+  console.log('[STEP 2] after trace charts present');
+
+  console.log('[STEP 3] before DOM lookup #insight-list');
+  console.log('[DOM]', document.getElementById('insight-list'));
+  console.log('[STEP 3] after DOM lookup #insight-list');
+
+  console.log('[STEP 4] before DOM lookup #delta-svg');
+  console.log('[DOM]', document.getElementById('delta-svg'));
+  console.log('[STEP 4] after DOM lookup #delta-svg');
+
+  console.log('[STEP 5] before DOM lookup #speed-svg');
+  console.log('[DOM]', document.getElementById('speed-svg'));
+  console.log('[STEP 5] after DOM lookup #speed-svg');
+
+  console.log('[STEP 6] before DOM lookup #brake-svg');
+  console.log('[DOM]', document.getElementById('brake-svg'));
+  console.log('[STEP 6] after DOM lookup #brake-svg');
+
+  console.log('[STEP 7] before DOM lookup #throttle-svg');
+  console.log('[DOM]', document.getElementById('throttle-svg'));
+  console.log('[STEP 7] after DOM lookup #throttle-svg');
+
+  console.log('[STEP 8] before DOM lookup #lap-summary-card');
+  console.log('[DOM]', document.getElementById('lap-summary-card'));
+  console.log('[STEP 8] after DOM lookup #lap-summary-card');
+
+  console.log('[STEP 9] before A assignment');
   const A = result.driver_a || selectedDriverA || DRIVERS_2023[0];
+  console.log('[STEP 9] after A assignment', A);
+
+  console.log('[STEP 10] before B assignment');
   const B = result.driver_b || selectedDriverB || DRIVERS_2023[2];
+  console.log('[STEP 10] after B assignment', B);
+
+  console.log('[STEP 11] before race assignment');
   const race = result.race || selectedRace || RACES_2023[5];
+  console.log('[STEP 11] after race assignment', race);
+
+  console.log('[STEP 12] before lap assignment');
   const lap = result.lap_summary || {};
+  console.log('[STEP 12] after lap assignment', lap);
+
+  console.log('[STEP 13] before sectors assignment');
   const sectors = result.sectors || [];
+  console.log('[STEP 13] after sectors assignment', sectors.length);
+
+  console.log('[STEP 14] before insights assignment');
   const insights = result.insights || [];
+  console.log('[STEP 14] after insights assignment', insights.length);
 
+  console.log('[STEP 15] before set analysis-race-label');
   document.getElementById('analysis-race-label').textContent = race.name + ' ' + currentYear;
-  document.getElementById('analysis-session-label').textContent = normalizeSessionLabel(selectedSession);
-  document.getElementById('analysis-drivers-label').textContent = A.code + ' vs ' + B.code;
-  document.getElementById('legend-a').textContent = A.code + ' ahead';
-  document.getElementById('legend-b').textContent = B.code + ' ahead';
-  document.getElementById('speed-legend-a').textContent = A.code;
-  document.getElementById('speed-legend-b').textContent = B.code;
-  document.documentElement.style.setProperty('--ver', A.color);
-  document.documentElement.style.setProperty('--ham', B.color);
+  console.log('[STEP 15] after set analysis-race-label');
 
+  console.log('[STEP 16] before set analysis-session-label');
+  document.getElementById('analysis-session-label').textContent = normalizeSessionLabel(selectedSession);
+  console.log('[STEP 16] after set analysis-session-label');
+
+  console.log('[STEP 17] before set analysis-drivers-label');
+  document.getElementById('analysis-drivers-label').textContent = A.code + ' vs ' + B.code;
+  console.log('[STEP 17] after set analysis-drivers-label');
+
+  console.log('[STEP 18] before set legend-a');
+  document.getElementById('legend-a').textContent = A.code + ' ahead';
+  console.log('[STEP 18] after set legend-a');
+
+  console.log('[STEP 19] before set legend-b');
+  document.getElementById('legend-b').textContent = B.code + ' ahead';
+  console.log('[STEP 19] after set legend-b');
+
+  console.log('[STEP 20] before set speed-legend-a');
+  document.getElementById('speed-legend-a').textContent = A.code;
+  console.log('[STEP 20] after set speed-legend-a');
+
+  console.log('[STEP 21] before set speed-legend-b');
+  document.getElementById('speed-legend-b').textContent = B.code;
+  console.log('[STEP 21] after set speed-legend-b');
+
+  console.log('[STEP 22] before set --ver');
+  document.documentElement.style.setProperty('--ver', A.color);
+  console.log('[STEP 22] after set --ver');
+
+  console.log('[STEP 23] before set --ham');
+  document.documentElement.style.setProperty('--ham', B.color);
+  console.log('[STEP 23] after set --ham');
+
+  console.log('[STEP 24] before deltaNum assignment');
   const deltaNum = Number(lap.total_delta_seconds || lap.delta || 0);
+  console.log('[STEP 24] after deltaNum assignment', deltaNum);
+
+  console.log('[STEP 25] before leaderColor assignment');
   const leaderColor = deltaNum <= 0 ? 'var(--ver)' : 'var(--ham)';
+  console.log('[STEP 25] after leaderColor assignment', leaderColor);
+
+  console.log('[STEP 26] before set lap-summary-card');
   document.getElementById('lap-summary-card').innerHTML = `
     <div class="lap-driver-row">
       <span class="lap-driver-name" style="color:var(--ver)">${A.code}</span>
@@ -1560,8 +1719,13 @@ function renderAnalysisApi(result) {
       <span class="lap-delta-val" style="color:${leaderColor}">${htmlEscape(lap.delta || '0.000')}s</span>
     </div>
   `;
+  console.log('[STEP 26] after set lap-summary-card');
 
+  console.log('[STEP 27] before set sector-count-label');
   document.getElementById('sector-count-label').textContent = `${sectors.length || 3} SECTORS`;
+  console.log('[STEP 27] after set sector-count-label');
+
+  console.log('[STEP 28] before set sector-breakdown');
   document.getElementById('sector-breakdown').innerHTML = sectors.map(s => `
     <div class="sector-row">
       <span class="sector-num">${htmlEscape(s.label)}</span>
@@ -1573,21 +1737,59 @@ function renderAnalysisApi(result) {
       </span>
     </div>
   `).join('');
+  console.log('[STEP 28] after set sector-breakdown');
 
+  console.log('[STEP 29] before renderInsightListApi');
   renderInsightListApi(insights, A, B);
+  console.log('[STEP 29] after renderInsightListApi');
+
+  console.log('[STEP 30] before representative_laps_a branch');
   if(lap.representative_laps_a) document.getElementById('rep-laps-ver').textContent = lap.representative_laps_a.join(',');
+  console.log('[STEP 30] after representative_laps_a branch');
+
+  console.log('[STEP 31] before representative_laps_b branch');
   if(lap.representative_laps_b) document.getElementById('rep-laps-ham').textContent = lap.representative_laps_b.join(',');
+  console.log('[STEP 31] after representative_laps_b branch');
+
+  console.log('[STEP 32] before renderDeltaSVGApi');
   renderDeltaSVGApi(result.charts, insights, A, B);
+  console.log('[STEP 32] after renderDeltaSVGApi');
+
+  console.log('[STEP 33] before renderSpeedSVGApi');
   renderSpeedSVGApi(result.charts, A, B);
+  console.log('[STEP 33] after renderSpeedSVGApi');
+
+  console.log('[STEP 34] before renderThrottleSVGApi');
   renderThrottleSVGApi(result.charts);
+  console.log('[STEP 34] after renderThrottleSVGApi');
+
+  console.log('[STEP 35] before renderThrottle2SVGApi');
   renderThrottle2SVGApi(result.charts);
+  console.log('[STEP 35] after renderThrottle2SVGApi');
+
+  console.log('[STEP 36] before renderBrakeSVGApi');
   renderBrakeSVGApi(result.charts);
+  console.log('[STEP 36] after renderBrakeSVGApi');
+
+  console.log('[STEP 37] before renderGearSVGApi');
   renderGearSVGApi(result.charts);
+  console.log('[STEP 37] after renderGearSVGApi');
+
+  console.log('[STEP 38] before renderWaterfallSVGApi');
   renderWaterfallSVGApi(result.charts, A, B);
+  console.log('[STEP 38] after renderWaterfallSVGApi');
+
+  console.log('[STEP 39] before applyMode');
   applyMode();
+  console.log('[STEP 39] after applyMode');
 }
 
 function renderAnalysis() {
+  console.log('[TRACE] entering renderAnalysis');
+  logDomNodeState('renderAnalysis page container', '#page-analysis');
+  logDomNodeState('renderAnalysis insights container', '#insight-list');
+  logDomNodeState('renderAnalysis lap summary container', '#lap-summary-card');
+  logDomNodeState('renderAnalysis delta chart container', '#delta-svg');
   if(currentAnalysis) {
     renderAnalysisApi(currentAnalysis);
     return;

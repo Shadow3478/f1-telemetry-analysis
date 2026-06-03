@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
+import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import get_settings
@@ -31,6 +34,7 @@ from tasks import run_telemetry_analysis
 
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
@@ -109,18 +113,21 @@ def create_analysis(request: AnalysisRequest, db: Session = Depends(get_db)) -> 
 
     cache_key = _cache_key(request)
     existing = db.scalar(select(AnalysisJobORM).where(AnalysisJobORM.cache_key == cache_key))
-    if existing and not request.force_refresh and existing.status == JobStatus.completed.value:
+    
+    if existing and not request.force_refresh:
         return JobResponse(
             job_id=existing.job_id,
-            status=JobStatus.completed,
+            status=existing.status,
             cached=True,
             poll_url=f"/api/analysis/{existing.job_id}",
         )
 
     job_id = str(uuid.uuid4())
+    actual_cache_key = cache_key if not request.force_refresh else f"{cache_key}:{job_id}"
+    
     job = AnalysisJobORM(
         job_id=job_id,
-        cache_key=cache_key if not request.force_refresh else f"{cache_key}:{job_id}",
+        cache_key=actual_cache_key,
         season=request.year,
         round=request.round,
         session=request.session,
@@ -128,13 +135,43 @@ def create_analysis(request: AnalysisRequest, db: Session = Depends(get_db)) -> 
         driver_b=request.driver_b,
         status=JobStatus.pending.value,
     )
-    db.add(job)
-    db.commit()
+    
+    try:
+        db.add(job)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(AnalysisJobORM).where(AnalysisJobORM.cache_key == actual_cache_key))
+        if existing:
+            return JobResponse(
+                job_id=existing.job_id,
+                status=existing.status,
+                cached=True,
+                poll_url=f"/api/analysis/{existing.job_id}",
+            )
+        raise HTTPException(status_code=500, detail="Failed to retrieve analysis job after concurrent insert")
+
     try:
         run_telemetry_analysis.delay(job_id)
-    except Exception:
-        run_telemetry_analysis.apply(args=[job_id])
+        logger.info("Analysis job %s dispatched to Celery", job_id)
+    except Exception as exc:
+        logger.warning("Celery unavailable (%s), running analysis in background thread for job %s", exc, job_id)
+        thread = threading.Thread(
+            target=_run_analysis_in_thread,
+            args=(job_id,),
+            daemon=True,
+        )
+        thread.start()
     return JobResponse(job_id=job_id, status=JobStatus.pending, cached=False, poll_url=f"/api/analysis/{job_id}")
+
+
+def _run_analysis_in_thread(job_id: str) -> None:
+    """Execute analysis in a background thread so the HTTP response is not blocked."""
+    try:
+        run_telemetry_analysis(job_id)
+        logger.info("Background analysis completed for job %s", job_id)
+    except Exception:
+        logger.exception("Background analysis failed for job %s", job_id)
 
 
 @app.get("/api/analysis/{job_id}", response_model=AnalysisResult)

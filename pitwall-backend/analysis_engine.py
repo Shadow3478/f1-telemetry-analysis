@@ -27,7 +27,7 @@ from models import (
 
 
 settings = get_settings()
-CHANNELS = ("Speed", "Throttle", "Brake", "nGear")
+CHANNELS = ("Speed", "Throttle", "Brake", "nGear", "X", "Y")
 
 
 @dataclass(frozen=True)
@@ -110,6 +110,10 @@ def build_analysis_result(
             "brake_b": grid_b["brake"],
             "gear_a": grid_a["gear"],
             "gear_b": grid_b["gear"],
+            "x_a": grid_a.get("x", np.zeros_like(grid_a["distance"])),
+            "y_a": grid_a.get("y", np.zeros_like(grid_a["distance"])),
+            "x_b": grid_b.get("x", np.zeros_like(grid_b["distance"])),
+            "y_b": grid_b.get("y", np.zeros_like(grid_b["distance"])),
         }
     )
     sectors = build_sector_breakdown(df)
@@ -202,8 +206,18 @@ def synthetic_aligned_grids(request: AnalysisRequest) -> tuple[dict, dict, float
     brake_b = np.where(np.gradient(speed_b) < -1.6, 1, 0)
     gear_a = np.clip(np.rint(speed_a / 42), 1, 8)
     gear_b = np.clip(np.rint(speed_b / 42), 1, 8)
-    grid_a = {"distance": distance, "speed": speed_a, "throttle": throttle_a, "brake": brake_a, "gear": gear_a}
-    grid_b = {"distance": distance, "speed": speed_b, "throttle": throttle_b, "brake": brake_b, "gear": gear_b}
+    # Generate a parametric closed racing track map (trigonometric loop)
+    angle = phase * 2 * math.pi
+    x_base = 600 * np.sin(angle) + 180 * np.sin(2 * angle) + 50 * np.cos(3 * angle)
+    y_base = 400 * np.cos(angle) + 100 * np.sin(2 * angle) + 40 * np.sin(4 * angle)
+    
+    x_a = x_base + rng.normal(0, 0.5, distance.size)
+    y_a = y_base + rng.normal(0, 0.5, distance.size)
+    x_b = x_base + 3.0 * np.sin(angle) + rng.normal(0, 0.5, distance.size)
+    y_b = y_base + 3.0 * np.cos(angle) + rng.normal(0, 0.5, distance.size)
+
+    grid_a = {"distance": distance, "speed": speed_a, "throttle": throttle_a, "brake": brake_a, "gear": gear_a, "x": x_a, "y": y_a}
+    grid_b = {"distance": distance, "speed": speed_b, "throttle": throttle_b, "brake": brake_b, "gear": gear_b, "x": x_b, "y": y_b}
     lap_a = float(np.sum(np.diff(distance, prepend=distance[0]) / np.maximum(speed_a / 3.6, 1.0)))
     lap_b = float(np.sum(np.diff(distance, prepend=distance[0]) / np.maximum(speed_b / 3.6, 1.0)))
     return grid_a, grid_b, lap_a, lap_b, [3, 5, 7, 9, 11], [2, 4, 6, 8, 10]
@@ -227,7 +241,7 @@ def _prepare_telemetry(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _normalized_channel_name(channel: str) -> str:
-    return {"Speed": "speed", "Throttle": "throttle", "Brake": "brake", "nGear": "gear"}[channel]
+    return {"Speed": "speed", "Throttle": "throttle", "Brake": "brake", "nGear": "gear", "X": "x", "Y": "y"}[channel]
 
 
 def _zone(df: pd.DataFrame, start: float, end: float) -> pd.DataFrame:

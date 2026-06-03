@@ -173,6 +173,10 @@ class ChartData(BaseModel):
     brake_b: list[float]
     gear_a: list[float]
     gear_b: list[float]
+    x_a: list[float] | None = None
+    y_a: list[float] | None = None
+    x_b: list[float] | None = None
+    y_b: list[float] | None = None
     waterfall: list[SectorWaterfallItem]
 
 
