@@ -12,11 +12,11 @@ __pycache__/
 *.parquet
 
 # FastF1 cache
-pitwall-backend/data/fastf1-cache/
+PlanE-backend/data/fastf1-cache/
 
 # VS Code
 .vscode/
 
 # Logs
 *.log
-pitwall-backend/fastf1_cache/
+PlanE-backend/fastf1_cache/

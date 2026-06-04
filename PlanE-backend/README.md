@@ -1,11 +1,11 @@
-# PitWall Backend
+# PlanE-backend
 
 FastAPI backend for `f1-telemetry.html`. It serves race/session filters, driver lists, async telemetry analysis jobs, insight drill-downs, and CSV/JSON/PDF exports.
 
 ## Setup
 
 ```powershell
-cd pitwall-backend
+cd PlanE-backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
