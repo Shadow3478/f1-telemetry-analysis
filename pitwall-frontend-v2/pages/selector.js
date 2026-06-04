@@ -25,13 +25,7 @@ import { getState, setState, resetSelection, RACES_2023, DRIVERS_2023 } from '..
 // ── STATIC FILTER DEFINITIONS ────────────────────────────────────────────
 
 const YEARS         = [2024, 2023, 2022, 2021, 2020, 2019, 2018];
-const SESSION_TYPES = [
-  { label: 'All',        value: 'all' },
-  { label: 'Qualifying', value: 'Q'   },
-  { label: 'Race',       value: 'R'   },
-  { label: 'Practice',   value: 'FP'  },
-  { label: 'Sprint',     value: 'S'   },
-];
+
 const CIRCUIT_TYPES = [
   { label: 'All circuits', value: 'all'       },
   { label: 'Street circuits', value: 'street'    },
@@ -58,8 +52,8 @@ export function initSelector() {
  * so the grid appears instantly when the user first clicks "Sessions".
  */
 export async function preloadRaces() {
-  const { currentYear, currentSessionFilter, currentCircuitFilter } = getState();
-  const races = await fetchRaces(currentYear, currentSessionFilter, currentCircuitFilter, '');
+  const { currentYear, currentCircuitFilter } = getState();
+  const races = await fetchRaces(currentYear, currentCircuitFilter, '');
   setState({ currentRaces: races });
 }
 
@@ -71,7 +65,7 @@ export async function preloadRaces() {
 
 function buildSidebar() {
   buildFilterGroup('sidebar-years',         YEARS.map(y => ({ label: String(y), value: y })), 'year');
-  buildFilterGroup('sidebar-session-types', SESSION_TYPES, 'sessionType');
+
   buildFilterGroup('sidebar-circuit-types', CIRCUIT_TYPES, 'circuitType');
 }
 
@@ -87,7 +81,7 @@ function buildFilterGroup(sectionId, items, filterKey) {
   const section = document.getElementById(sectionId);
   if (!section || section.querySelector('.filter-btn')) return; // Already built
 
-  const { currentYear, currentSessionFilter, currentCircuitFilter } = getState();
+  const { currentYear, currentCircuitFilter } = getState();
 
   items.forEach((item, i) => {
     const btn = document.createElement('button');
@@ -97,7 +91,6 @@ function buildFilterGroup(sectionId, items, filterKey) {
     // Mark initial active state
     const isActive =
       (filterKey === 'year'        && item.value === currentYear)          ||
-      (filterKey === 'sessionType' && item.value === currentSessionFilter) ||
       (filterKey === 'circuitType' && item.value === currentCircuitFilter) ||
       (filterKey === 'year'        && i === 0 && currentYear === 2023);
     if (isActive) btn.classList.add('active');
@@ -119,8 +112,6 @@ function onFilterClick(clickedBtn, filterKey, value) {
     setState({ currentYear: Number(value) });
     resetSelection();
     document.getElementById('driver-selector').style.display = 'none';
-  } else if (filterKey === 'sessionType') {
-    setState({ currentSessionFilter: value });
   } else if (filterKey === 'circuitType') {
     setState({ currentCircuitFilter: value });
   }
@@ -154,9 +145,9 @@ export async function renderRaceGrid() {
     <div style="grid-column:1/-1; color:var(--text3); font-family:var(--font-mono);
                 font-size:12px; padding:20px;">loading sessions...</div>`;
 
-  const { currentYear, currentSessionFilter, currentCircuitFilter, currentSearch } = getState();
+  const { currentYear, currentCircuitFilter, currentSearch } = getState();
 
-  const races = await fetchRaces(currentYear, currentSessionFilter, currentCircuitFilter, currentSearch);
+  const races = await fetchRaces(currentYear, currentCircuitFilter, currentSearch);
   setState({ currentRaces: races });
 
   // Update count label
@@ -246,6 +237,10 @@ function onSessionPillClick(round, session) {
       document.getElementById('driver-selector').style.display = 'block';
       loadAndRenderDrivers();
     }
+  } else {
+    // If clicking a new session on the currently selected race, reload drivers
+    setState({ selectedDriverA: null, selectedDriverB: null });
+    loadAndRenderDrivers();
   }
 
   renderRaceGrid();
@@ -361,10 +356,9 @@ function bindCompareButton() {
  * Fetch races from the API. Falls back to filtered RACES_2023 demo data
  * if the backend is unreachable.
  */
-async function fetchRaces(year, sessionType, circuitType, search) {
+async function fetchRaces(year, circuitType, search) {
   try {
     const query = new URLSearchParams({
-      session_type: sessionType,
       circuit_type: circuitType,
       search:       search,
     });

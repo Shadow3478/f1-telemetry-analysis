@@ -273,15 +273,31 @@ function bindTelemetryScrubber(charts) {
       const el = (id) => document.getElementById(id);
       if (el('scrubber-delta')) el('scrubber-delta').textContent = charts.delta && charts.delta[idx] !== undefined ? `${charts.delta[idx].toFixed(3)}s` : '0.000s';
       
-      if (el('readout-spd-a')) el('readout-spd-a').textContent = charts.speed_a ? `${Math.round(charts.speed_a[idx])} km/h` : '0 km/h';
-      if (el('readout-thr-a')) el('readout-thr-a').textContent = charts.throttle_a ? `${Math.round(charts.throttle_a[idx])} %` : '0 %';
-      if (el('readout-brk-a')) el('readout-brk-a').textContent = charts.brake_a ? `${Math.round(charts.brake_a[idx] * 100)} %` : '0 %';
-      if (el('readout-gear-a')) el('readout-gear-a').textContent = charts.gear_a ? charts.gear_a[idx] : '0';
+      const spd_a = charts.speed_a ? charts.speed_a[idx] : 0;
+      const thr_a = charts.throttle_a ? charts.throttle_a[idx] : 0;
+      const brk_a = charts.brake_a ? charts.brake_a[idx] : 0;
+      const gear_a = charts.gear_a ? charts.gear_a[idx] : 0;
       
-      if (el('readout-spd-b')) el('readout-spd-b').textContent = charts.speed_b ? `${Math.round(charts.speed_b[idx])} km/h` : '0 km/h';
-      if (el('readout-thr-b')) el('readout-thr-b').textContent = charts.throttle_b ? `${Math.round(charts.throttle_b[idx])} %` : '0 %';
-      if (el('readout-brk-b')) el('readout-brk-b').textContent = charts.brake_b ? `${Math.round(charts.brake_b[idx] * 100)} %` : '0 %';
-      if (el('readout-gear-b')) el('readout-gear-b').textContent = charts.gear_b ? charts.gear_b[idx] : '0';
+      const spd_b = charts.speed_b ? charts.speed_b[idx] : 0;
+      const thr_b = charts.throttle_b ? charts.throttle_b[idx] : 0;
+      const brk_b = charts.brake_b ? charts.brake_b[idx] : 0;
+      const gear_b = charts.gear_b ? charts.gear_b[idx] : 0;
+      
+      console.log(`[Scrubber] currentIndex: ${idx}`);
+      console.log(`[Scrubber] driver_a speed: ${spd_a}, driver_b speed: ${spd_b}`);
+      console.log(`[Scrubber] driver_a throttle: ${thr_a}, driver_b throttle: ${thr_b}`);
+      console.log(`[Scrubber] driver_a brake: ${brk_a}, driver_b brake: ${brk_b}`);
+      console.log(`[Scrubber] driver_a gear: ${gear_a}, driver_b gear: ${gear_b}`);
+
+      if (el('readout-spd-a')) el('readout-spd-a').textContent = `${Math.round(spd_a)} km/h`;
+      if (el('readout-thr-a')) el('readout-thr-a').textContent = `${Math.round(thr_a)} %`;
+      if (el('readout-brk-a')) el('readout-brk-a').textContent = `${Math.round(brk_a * 100)} %`;
+      if (el('readout-gear-a')) el('readout-gear-a').textContent = `${gear_a}`;
+      
+      if (el('readout-spd-b')) el('readout-spd-b').textContent = `${Math.round(spd_b)} km/h`;
+      if (el('readout-thr-b')) el('readout-thr-b').textContent = `${Math.round(thr_b)} %`;
+      if (el('readout-brk-b')) el('readout-brk-b').textContent = `${Math.round(brk_b * 100)} %`;
+      if (el('readout-gear-b')) el('readout-gear-b').textContent = `${gear_b}`;
     }
 
     // Trigger fast 60fps cursor movements on all SVG visual layers
@@ -293,11 +309,12 @@ function bindTelemetryScrubber(charts) {
     updateGearChartCursor(idx);
   };
 
-  // Bind listener (ensure only once)
-  if (!slider._pitwallBound) {
-    slider._pitwallBound = true;
-    slider.addEventListener('input', handleInput);
+  // Bind listener (remove old one to avoid stale closures)
+  if (slider._pitwallHandler) {
+    slider.removeEventListener('input', slider._pitwallHandler);
   }
+  slider._pitwallHandler = handleInput;
+  slider.addEventListener('input', handleInput);
 
   // Trigger initial paint at index 0
   slider.value = '0';

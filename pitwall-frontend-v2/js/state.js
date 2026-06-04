@@ -108,7 +108,6 @@ const AppState = {
 
   // ── Session Selector filters ─────────────────────────────────────────
   currentYear:          2023,
-  currentSessionFilter: 'all',
   currentCircuitFilter: 'all',
   currentSearch:        '',
 

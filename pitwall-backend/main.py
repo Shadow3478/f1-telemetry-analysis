@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import get_settings
-from data_sources import RaceFilters, get_driver, get_race, list_drivers, list_races
+from data_sources import RaceFilters, get_driver, get_race, list_drivers, list_races, get_session_drivers_fastf1, resolve_session_drivers
 from database import get_db, init_database, loads_json, read_telemetry_parquet
 from models import (
     AnalysisJobORM,
@@ -96,18 +96,26 @@ def drivers(year: int, db: Session = Depends(get_db)) -> list[Driver]:
 def race_drivers(year: int, round_num: int, session: str = "Q3", db: Session = Depends(get_db)) -> list[Driver]:
     if get_race(db, year, round_num) is None:
         raise HTTPException(status_code=404, detail="Race not found")
+    
+    drivers = get_session_drivers_fastf1(year, round_num, session)
+    if drivers:
+        return drivers
+        
     return list_drivers(db, year)
 
 
 @app.post("/api/analysis", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 def create_analysis(request: AnalysisRequest, db: Session = Depends(get_db)) -> JobResponse:
     race = get_race(db, request.year, request.round)
-    driver_a = get_driver(db, request.year, request.driver_a)
-    driver_b = get_driver(db, request.year, request.driver_b)
     if race is None:
         raise HTTPException(status_code=404, detail="Race not found")
-    if driver_a is None or driver_b is None:
-        raise HTTPException(status_code=404, detail="Driver not found")
+        
+    try:
+        driver_a, driver_b = resolve_session_drivers(
+            request.year, request.round, request.session, request.driver_a, request.driver_b
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if request.session not in race.sessions and request.session != "Q":
         raise HTTPException(status_code=400, detail=f"Session {request.session} is not available for this race")
 

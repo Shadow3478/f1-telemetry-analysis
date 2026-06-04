@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from analysis_engine import align_distance_grid, build_analysis_result, synthetic_aligned_grids
 from config import get_settings
-from data_sources import get_driver, get_race
+from data_sources import get_race, resolve_session_drivers
 from database import SessionLocal, dumps_json, write_parquet
 from models import AnalysisJobORM, AnalysisRequest, JobStatus
 
@@ -37,15 +37,14 @@ def run_telemetry_analysis(self, job_id: str) -> dict:
             driver_b=job.driver_b,
         )
         race = get_race(db, request.year, request.round)
-        driver_a = get_driver(db, request.year, request.driver_a)
-        driver_b = get_driver(db, request.year, request.driver_b)
-        if not race or not driver_a or not driver_b:
-            raise RuntimeError("Race or driver metadata is unavailable")
+        if not race:
+            raise RuntimeError("Race metadata is unavailable")
+            
+        driver_a, driver_b = resolve_session_drivers(
+            request.year, request.round, request.session, request.driver_a, request.driver_b
+        )
 
-        try:
-            grid_a, grid_b, lap_a, lap_b, rep_a, rep_b = _fastf1_grids(request)
-        except Exception:
-            grid_a, grid_b, lap_a, lap_b, rep_a, rep_b = synthetic_aligned_grids(request)
+        grid_a, grid_b, lap_a, lap_b, rep_a, rep_b = _fastf1_grids(request)
 
         job.progress = 0.65
         job.updated_at = datetime.utcnow()

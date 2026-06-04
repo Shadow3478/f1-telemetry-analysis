@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import logging
 from typing import Iterable
 
 import httpx
@@ -13,6 +14,7 @@ from models import Driver, DriverORM, Race, RaceORM
 
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 CIRCUIT_TYPES = {
     "Bahrain International Circuit": "high-speed",
@@ -270,3 +272,73 @@ def _fallback_races_for_season(season: int) -> list[Race]:
 
 def _fallback_drivers_for_season(season: int) -> list[Driver]:
     return [driver.model_copy() for driver in FALLBACK_DRIVERS_2023]
+
+
+def get_session_drivers_fastf1(year: int, round_num: int, session_code: str) -> list[Driver]:
+    import fastf1
+
+    fastf1.Cache.enable_cache(str(settings.fastf1_cache_dir))
+    mapped_code = "Q" if session_code in {"Q1", "Q2", "Q3"} else session_code
+    
+    try:
+        session = fastf1.get_session(year, round_num, mapped_code)
+        session.load(telemetry=False, weather=False, messages=False, laps=True)
+    except Exception:
+        return []
+        
+    if getattr(session, 'laps', None) is None or session.laps.empty:
+        return []
+
+    quicklaps = session.laps.pick_quicklaps()
+    if quicklaps.empty:
+        return []
+        
+    valid_driver_codes = set(quicklaps['Driver'].unique())
+    
+    res = session.results
+    drivers = []
+    
+    for _, row in res.iterrows():
+        code = row.get("Abbreviation")
+        if not code or str(code) not in valid_driver_codes:
+            continue
+            
+        team = str(row.get("TeamName", "Unknown"))
+        color = row.get("TeamColor")
+        
+        drivers.append(Driver(
+            code=str(code),
+            num=int(row.get("DriverNumber", 0)),
+            name=str(row.get("BroadcastName", code)),
+            team=team,
+            color=f"#{color}" if color else TEAM_COLORS.get(team, "#8A96A8")
+        ))
+        
+    return drivers
+
+
+def resolve_session_drivers(year: int, round_num: int, session_code: str, code_a: str, code_b: str) -> tuple[Driver, Driver]:
+    """Helper to load session drivers via FastF1 and resolve the two requested drivers."""
+    code_a = code_a.upper()
+    code_b = code_b.upper()
+    
+    logger.info(f"Resolving drivers for {year} Round {round_num} Session {session_code}")
+    logger.info(f"Incoming driver codes: {code_a} vs {code_b}")
+    
+    session_drivers = get_session_drivers_fastf1(year, round_num, session_code)
+    available_codes = [d.code for d in session_drivers]
+    
+    logger.info(f"Available session driver codes: {available_codes}")
+    
+    driver_a = next((d for d in session_drivers if d.code == code_a), None)
+    driver_b = next((d for d in session_drivers if d.code == code_b), None)
+    
+    if driver_a and driver_b:
+        logger.info(f"Resolved drivers: {driver_a.name} ({driver_a.team}) vs {driver_b.name} ({driver_b.team})")
+    else:
+        logger.warning(f"Driver validation failed. {code_a} found: {bool(driver_a)}, {code_b} found: {bool(driver_b)}")
+        
+    if not driver_a or not driver_b:
+        raise ValueError(f"One or both drivers not found in session data (Available: {available_codes})")
+        
+    return driver_a, driver_b
