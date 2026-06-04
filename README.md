@@ -1,6 +1,6 @@
 # Plan E - F1 Telemetry Analytics
 
-**Plan E** (formerly PitWall) is a full-stack web application designed for deep, lap-by-lap Formula 1 driver telemetry comparisons. It isolates exactly where and how time is gained or lost across braking, corner entry, apex, and exit using official FastF1 data.
+**Plan E** is a full-stack web application designed for deep, lap-by-lap Formula 1 driver telemetry comparisons. It isolates exactly where and how time is gained or lost across braking, corner entry, apex, and exit using official FastF1 data.
 
 This project consists of two main components:
 1. **PlanE-backend**: A Python FastAPI backend with a Celery worker pool for heavy data crunching and telemetry alignment.
