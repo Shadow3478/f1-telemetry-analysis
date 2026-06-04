@@ -21,10 +21,10 @@
 //
 // Reads from localStorage so developers can override it in the browser
 // console without touching code:
-//   localStorage.setItem('PITWALL_API_BASE', 'http://my-server:8000/api')
+//   localStorage.setItem('PLAN_E_API_BASE', 'http://my-server:8000/api')
 //
 export const API_BASE =
-  localStorage.getItem('PITWALL_API_BASE') || 'http://localhost:8000/api';
+  localStorage.getItem('PLAN_E_API_BASE') || 'http://localhost:8000/api';
 
 
 // ── CORE FETCH HELPERS ───────────────────────────────────────────────────
@@ -53,7 +53,7 @@ export async function apiGet(path) {
  */
 export async function apiPost(path, body) {
   const url = `${API_BASE}${path}`;
-  console.log('[PITWALL] POST', url, body);
+  console.log('[PLAN E] POST', url, body);
 
   const res = await fetch(url, {
     method:  'POST',
@@ -61,11 +61,11 @@ export async function apiPost(path, body) {
     body:    JSON.stringify(body),
   });
 
-  console.log('[PITWALL] POST', url, '→', res.status);
+  console.log('[PLAN E] POST', url, '→', res.status);
   if (!res.ok) throw new Error(await apiErrorText(res));
 
   const data = await res.json();
-  console.log('[PITWALL] POST response:', data);
+  console.log('[PLAN E] POST response:', data);
   return data;
 }
 

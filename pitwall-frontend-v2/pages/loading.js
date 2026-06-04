@@ -96,7 +96,7 @@ export async function runAnalysis() {
 
   // Guard: all three must be selected
   if (!selectedDriverA || !selectedDriverB || !selectedRace) {
-    console.warn('[PITWALL] runAnalysis() aborted — missing selection', {
+    console.warn('[PLAN E] runAnalysis() aborted — missing selection', {
       selectedDriverA, selectedDriverB, selectedRace,
     });
     return;
@@ -119,12 +119,12 @@ export async function runAnalysis() {
     force_refresh: false,
   };
 
-  console.log('[PITWALL] Analysis request:', JSON.stringify(requestBody));
+  console.log('[PLAN E] Analysis request:', JSON.stringify(requestBody));
 
   try {
     // ── Step 1: Submit the job ──────────────────────────────────────────
     const job = await apiPost('/analysis', requestBody);
-    console.log('[PITWALL] Job submitted:', job);
+    console.log('[PLAN E] Job submitted:', job);
 
     setState({ currentJobId: job.job_id, apiOnline: true });
     updateLoader(15, 'job accepted — polling for results');
@@ -134,7 +134,7 @@ export async function runAnalysis() {
       updateLoader(pct, label);
     });
 
-    console.log('[PITWALL] Analysis complete');
+    console.log('[PLAN E] Analysis complete');
 
     // ── Step 3: Extract the result payload ─────────────────────────────
     // The backend wraps the result inside { result: {...} } or { data: {...} }
@@ -149,7 +149,7 @@ export async function runAnalysis() {
     setTimeout(() => goTo('analysis'), 300);
 
   } catch (err) {
-    console.error('[PITWALL] runAnalysis() failed:', err);
+    console.error('[PLAN E] runAnalysis() failed:', err);
     setState({ apiOnline: false });
 
     // ── Show the error state inline in the overlay — NO alert() ──────────
