@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import gc
 import io
 import logging
 import threading
@@ -75,10 +76,40 @@ async def preload_background_loop():
         await asyncio.sleep(60 * 60)
 
 
+def _check_redis_health() -> bool:
+    """Attempt to ping Redis. Returns True if reachable, False otherwise."""
+    try:
+        import redis as redis_lib
+        client = redis_lib.from_url(settings.redis_url, socket_connect_timeout=3)
+        client.ping()
+        logger.info("✓ Redis is reachable at %s", settings.redis_url.split("@")[-1])
+        return True
+    except Exception as exc:
+        logger.warning("✗ Redis unreachable (%s) — Celery tasks will not dispatch", exc)
+        return False
+
+
+_celery_available = False  # Set at startup, controls fallback behavior
+
+
 @app.on_event("startup")
 def startup() -> None:
+    global _celery_available
     init_database()
-    asyncio.create_task(preload_background_loop())
+
+    # Production validation
+    settings.validate_production()
+
+    # Check Redis connectivity
+    _celery_available = _check_redis_health()
+
+    # Preloader: disabled in production (saves ~500MB RAM on Hobby plan)
+    if settings.is_production or settings.disable_preloader:
+        logger.info("Preloader DISABLED (production=%s, disable_preloader=%s)",
+                    settings.is_production, settings.disable_preloader)
+    else:
+        logger.info("Preloader ENABLED (development mode)")
+        asyncio.create_task(preload_background_loop())
 
 
 @app.get("/api/health")
@@ -240,27 +271,45 @@ def create_analysis(request: AnalysisRequest, db: Session = Depends(get_db)) -> 
             )
         raise HTTPException(status_code=500, detail="Failed to retrieve analysis job after concurrent insert")
 
-    try:
-        run_telemetry_analysis.delay(job_id)
-        logger.info("Analysis job %s dispatched to Celery", job_id)
-    except Exception as exc:
-        logger.warning("Celery unavailable (%s), running analysis in background thread for job %s", exc, job_id)
+    dispatched = False
+    if _celery_available:
+        try:
+            run_telemetry_analysis.delay(job_id)
+            logger.info("Analysis job %s dispatched to Celery worker", job_id)
+            dispatched = True
+        except Exception as exc:
+            logger.exception("Celery dispatch failed for job %s — falling back to thread", job_id)
+
+    if not dispatched:
+        # No Redis/Celery — run in a background thread.
+        # This is expected on Render Hobby plan (no Redis add-on).
+        logger.info(
+            "Running analysis job %s in background thread (Celery unavailable)", job_id
+        )
         thread = threading.Thread(
             target=_run_analysis_in_thread,
             args=(job_id,),
             daemon=True,
         )
         thread.start()
+
     return JobResponse(job_id=job_id, status=JobStatus.pending, cached=False, poll_url=f"/api/analysis/{job_id}")
 
 
 def _run_analysis_in_thread(job_id: str) -> None:
-    """Execute analysis in a background thread so the HTTP response is not blocked."""
+    """Execute analysis in a background thread.
+
+    Includes explicit garbage collection after completion to free
+    FastF1 DataFrames and keep memory usage within Render Hobby limits.
+    """
     try:
         run_telemetry_analysis(job_id)
-        logger.info("Background analysis completed for job %s", job_id)
+        logger.info("Background thread analysis completed for job %s", job_id)
     except Exception:
-        logger.exception("Background analysis failed for job %s", job_id)
+        logger.exception("Background thread analysis FAILED for job %s", job_id)
+    finally:
+        gc.collect()
+        logger.info("GC collect completed after job %s", job_id)
 
 
 @app.get("/api/analysis/{job_id}", response_model=AnalysisResult)

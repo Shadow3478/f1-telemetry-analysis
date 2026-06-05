@@ -74,7 +74,7 @@ def run_preload_cycle() -> None:
                         try:
                             # Load telemetry
                             session = fastf1.get_session(year, round_num, session_id)
-                            session.load(telemetry=True, weather=False, messages=False, laps=True)
+                            session.load(telemetry=False, weather=False, messages=False, laps=True)
                             
                             duration = time.time() - start_time
                             logger.info(f"Cache generated for {year} Round {round_num} {session_id} in {duration:.1f}s")
@@ -92,7 +92,7 @@ def run_preload_cycle() -> None:
                             db.commit()
                             
                         except Exception as e:
-                            logger.error(f"Failed to preload {year} Round {round_num} {session_id}: {e}")
+                            logger.exception("Failed to preload %s Round %s %s", year, round_num, session_id)
                             if not existing:
                                 existing = TelemetryCacheRegistryORM(
                                     season=year,

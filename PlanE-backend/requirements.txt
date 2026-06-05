@@ -14,3 +14,4 @@ httpx==0.28.1
 fastf1==3.4.4
 python-dotenv==1.0.1
 reportlab==4.2.5
+psutil==6.1.1
