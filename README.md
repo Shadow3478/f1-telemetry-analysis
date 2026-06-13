@@ -66,6 +66,3 @@ A bespoke Vanilla JS architecture designed for maximum performance and direct DO
 The backend dynamically fetches session calendars and driver lists. Note that historical data availability is dependent on the FastF1 / Ergast upstream APIs.
 
 ---
-
-## 📜 License
-MIT License. Data is provided for non-commercial, analytical purposes via the FastF1 library.
