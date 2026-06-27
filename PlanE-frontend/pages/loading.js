@@ -39,6 +39,7 @@ export function showLoader(initialMsg = 'initialising…') {
 
   overlay.classList.remove('hidden');
   overlay.style.opacity       = '1';
+  overlay.style.display       = 'flex'; // Reset display so it's visible again on second run
   overlay.style.pointerEvents = 'all';
   if (bar) bar.style.width    = '0%';
   if (msg) msg.textContent    = initialMsg;

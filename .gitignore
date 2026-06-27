@@ -7,6 +7,8 @@ __pycache__/
 
 # Database
 *.db
+*.sqlite
+*.sqlite3
 
 # Telemetry data
 *.parquet
@@ -20,3 +22,8 @@ PlanE-backend/data/fastf1-cache/
 # Logs
 *.log
 PlanE-backend/fastf1_cache/
+
+# FastF1 cache
+**/data/cache/
+**/fastf1-cache/
+**/fastf1_cache/
