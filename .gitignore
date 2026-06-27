@@ -27,3 +27,7 @@ PlanE-backend/fastf1_cache/
 **/data/cache/
 **/fastf1-cache/
 **/fastf1_cache/
+
+# SQLite WAL files
+*.db-shm
+*.db-wal

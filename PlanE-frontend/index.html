@@ -449,37 +449,57 @@
       </div>
 
       <!-- Telemetry scrubber slider — visible across all tabs -->
-      <div class="chart-card telemetry-scrubber-card" style="margin-top:14px;">
-        <div class="scrubber-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 4px;">
-          <span style="font-family:var(--font-mono); font-size:11px; color:var(--text3); letter-spacing:0.1em;">TELEMETRY SCRUBBER</span>
-          <div style="display:flex; gap:12px;">
-            <span style="font-family:var(--font-mono); font-size:11px; color:var(--text2);">Δt: <span id="scrubber-delta">0.000s</span></span>
-            <span id="scrubber-distance" style="font-family:var(--font-mono); font-size:11px; color:var(--text2);">0.0 m</span>
+      <div class="telemetry-scrubber-card" style="margin-top:14px;">
+
+        <!-- Top bar: label + live readouts + reset button -->
+        <div class="tscrub-topbar">
+          <div class="tscrub-label-wrap">
+            <div class="tscrub-accent-bar"></div>
+            <span class="tscrub-label">Telemetry Scrubber</span>
+          </div>
+          <div class="tscrub-metrics">
+            <div class="tscrub-metric">
+              <span class="tscrub-metric-key">Δt</span>
+              <span class="tscrub-metric-val" id="scrubber-delta">0.000s</span>
+            </div>
+            <div class="tscrub-metric">
+              <span class="tscrub-metric-key">DIST</span>
+              <span class="tscrub-metric-val" id="scrubber-distance">0.0 m</span>
+            </div>
+            <div class="tscrub-metric tscrub-metric--index">
+              <span class="tscrub-metric-key">IDX</span>
+              <span class="tscrub-metric-val" id="scrubber-index">0</span>
+            </div>
+            <button class="tscrub-reset-btn" id="tscrub-reset" title="Reset to start">Ø</button>
           </div>
         </div>
-        <div class="scrubber-body" style="display:flex; align-items:center; gap:16px; margin-bottom:12px;">
-          <input type="range" id="telemetry-slider" min="0" max="999" value="0" style="flex-grow:1; accent-color:var(--ver); cursor:pointer;">
-          <div class="scrubber-value" id="scrubber-index" style="width:48px; text-align:right; font-family:var(--font-mono); font-size:12px; color:var(--text2); background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:4px; border:1px solid var(--border);">0</div>
+
+        <!-- Slider row -->
+        <div class="tscrub-slider-row">
+          <input type="range" class="tscrub-range" id="telemetry-slider"
+                 min="0" max="999" value="0"
+                 style="--fill-pct: 0%">
         </div>
-        
-        <!-- Live Readout -->
-        <div class="scrubber-readout" style="display:flex; justify-content:space-between; padding:8px 12px; background:rgba(255,255,255,0.02); border-radius:4px; border:1px solid rgba(255,255,255,0.05);">
-          <div style="display:flex; flex-direction:column; gap:4px; width:45%;">
-            <div style="font-family:var(--font-mono); font-size:10px; color:var(--ver); letter-spacing:0.05em; margin-bottom:2px;">DRIVER A</div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>SPD:</span><span id="readout-spd-a">0 km/h</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>THR:</span><span id="readout-thr-a">0 %</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>BRK:</span><span id="readout-brk-a">0 %</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>GEAR:</span><span id="readout-gear-a">0</span></div>
+
+        <!-- Live Readout: two driver columns -->
+        <div class="tscrub-readout">
+          <div class="tscrub-driver tscrub-driver--a">
+            <div class="tscrub-driver-name" id="tscrub-name-a">DRIVER A</div>
+            <div class="tscrub-row"><span>SPD</span><span id="readout-spd-a">0 km/h</span></div>
+            <div class="tscrub-row"><span>THR</span><span id="readout-thr-a">0%</span></div>
+            <div class="tscrub-row"><span>BRK</span><span id="readout-brk-a">0%</span></div>
+            <div class="tscrub-row"><span>GEAR</span><span id="readout-gear-a">—</span></div>
           </div>
-          <div style="width:1px; background:rgba(255,255,255,0.05);"></div>
-          <div style="display:flex; flex-direction:column; gap:4px; width:45%;">
-            <div style="font-family:var(--font-mono); font-size:10px; color:var(--ham); letter-spacing:0.05em; margin-bottom:2px;">DRIVER B</div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>SPD:</span><span id="readout-spd-b">0 km/h</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>THR:</span><span id="readout-thr-b">0 %</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>BRK:</span><span id="readout-brk-b">0 %</span></div>
-            <div style="display:flex; justify-content:space-between; font-size:12px; font-family:var(--font-mono); color:var(--text2);"><span>GEAR:</span><span id="readout-gear-b">0</span></div>
+          <div class="tscrub-divider"></div>
+          <div class="tscrub-driver tscrub-driver--b">
+            <div class="tscrub-driver-name" id="tscrub-name-b">DRIVER B</div>
+            <div class="tscrub-row"><span>SPD</span><span id="readout-spd-b">0 km/h</span></div>
+            <div class="tscrub-row"><span>THR</span><span id="readout-thr-b">0%</span></div>
+            <div class="tscrub-row"><span>BRK</span><span id="readout-brk-b">0%</span></div>
+            <div class="tscrub-row"><span>GEAR</span><span id="readout-gear-b">—</span></div>
           </div>
         </div>
+
       </div>
     </div>
 

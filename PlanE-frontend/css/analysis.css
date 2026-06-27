@@ -271,3 +271,234 @@
   .right-panel  { display: none; }
   .center-panel { padding: 16px; }
 }
+
+/* ─── TELEMETRY SCRUBBER CARD ────────────────────────────────────────── */
+/*
+ * Purpose-built, integrated scrubber. No inline styles — everything lives
+ * here so it's easy to retheme from the token layer in layout.css.
+ *
+ * Key decisions:
+ *   - Left accent bar + mono label mirrors the chart-header pattern.
+ *   - Metric chips share the same border/bg token as chart-card borders.
+ *   - Range input is fully custom (no browser default appearance) so the
+ *     orange filled-track and red thumb render identically cross-browser.
+ *   - --fill-pct is set inline by JS on every `input` event to drive the
+ *     linear-gradient that fakes the filled portion of the track.
+ *   - Driver colour slots (--ver, --ham) are the same tokens analysis.js
+ *     overrides with real team colours.
+ */
+
+.telemetry-scrubber-card {
+  background:    var(--bg2);
+  border:        1px solid var(--border);
+  border-radius: 4px;
+  overflow:      hidden;
+}
+
+/* ── Top bar ── */
+.tscrub-topbar {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             12px;
+  padding:         10px 16px;
+  border-bottom:   1px solid var(--border);
+  background:      rgba(255, 255, 255, 0.015);
+}
+
+.tscrub-label-wrap {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+
+/* 2 px red accent rule — mirrors .section-label::before */
+.tscrub-accent-bar {
+  width:        2px;
+  height:       14px;
+  background:   var(--red);
+  border-radius:1px;
+  flex-shrink:  0;
+}
+
+.tscrub-label {
+  font-family:    var(--font-mono);
+  font-size:      10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color:          var(--text3);
+}
+
+/* ── Metric chips ── */
+.tscrub-metrics {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+}
+
+.tscrub-metric {
+  display:       flex;
+  align-items:   center;
+  gap:           6px;
+  background:    var(--bg3);
+  border:        1px solid var(--border);
+  border-radius: 3px;
+  padding:       4px 10px;
+  font-family:   var(--font-mono);
+  font-size:     11px;
+  white-space:   nowrap;
+}
+.tscrub-metric-key {
+  color:          var(--text3);
+  letter-spacing: 0.08em;
+  font-size:      10px;
+}
+.tscrub-metric-val {
+  color: var(--text);
+}
+.tscrub-metric--index { min-width: 60px; }
+
+/* ── Reset button ── */
+.tscrub-reset-btn {
+  width:         32px;
+  height:        32px;
+  display:       flex;
+  align-items:   center;
+  justify-content:center;
+  background:    var(--bg3);
+  border:        1px solid var(--border2);
+  border-radius: 3px;
+  color:         var(--text3);
+  font-family:   var(--font-mono);
+  font-size:     14px;
+  cursor:        pointer;
+  transition:    border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink:   0;
+}
+.tscrub-reset-btn:hover {
+  border-color: var(--red);
+  color:        var(--red2);
+  background:   var(--red-dim);
+}
+
+/* ── Slider row ── */
+.tscrub-slider-row {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * Custom range input.
+ * The filled portion is a linear-gradient driven by --fill-pct.
+ * JS must set:  slider.style.setProperty('--fill-pct', pct + '%')
+ * on every input event.
+ */
+.tscrub-range {
+  -webkit-appearance: none;
+  appearance:         none;
+  flex:               1;
+  height:             4px;
+  border-radius:      2px;
+  outline:            none;
+  cursor:             pointer;
+  background:
+    linear-gradient(
+      to right,
+      var(--red) 0%,
+      var(--red) var(--fill-pct, 0%),
+      var(--bg4) var(--fill-pct, 0%),
+      var(--bg4) 100%
+    );
+}
+
+/* Thumb — Webkit */
+.tscrub-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance:         none;
+  width:              16px;
+  height:             16px;
+  border-radius:      50%;
+  background:         var(--red2);
+  border:             2px solid rgba(255, 255, 255, 0.20);
+  box-shadow:         0 0 0 3px rgba(232, 51, 26, 0.18);
+  cursor:             pointer;
+  transition:         box-shadow 0.15s, transform 0.1s;
+}
+.tscrub-range::-webkit-slider-thumb:hover {
+  box-shadow:  0 0 0 5px rgba(232, 51, 26, 0.25);
+  transform:   scale(1.1);
+}
+.tscrub-range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px rgba(232, 51, 26, 0.35);
+}
+
+/* Thumb — Firefox */
+.tscrub-range::-moz-range-thumb {
+  width:         16px;
+  height:        16px;
+  border-radius: 50%;
+  background:    var(--red2);
+  border:        2px solid rgba(255, 255, 255, 0.20);
+  box-shadow:    0 0 0 3px rgba(232, 51, 26, 0.18);
+  cursor:        pointer;
+  transition:    box-shadow 0.15s;
+}
+.tscrub-range::-moz-range-thumb:hover {
+  box-shadow: 0 0 0 5px rgba(232, 51, 26, 0.25);
+}
+/* Remove Firefox's inner track highlight */
+.tscrub-range::-moz-range-progress { background: var(--red); }
+.tscrub-range::-moz-range-track    { background: var(--bg4); height: 4px; border-radius: 2px; }
+
+/* ── Readout: two-column driver telemetry ── */
+.tscrub-readout {
+  display:       grid;
+  grid-template-columns: 1fr 1px 1fr;
+  padding:       12px 16px;
+  background:    rgba(0, 0, 0, 0.12);
+  border-top:    1px solid var(--border);
+  gap:           0;
+}
+
+.tscrub-divider {
+  background: var(--border);
+  margin:     0 16px;
+}
+
+.tscrub-driver {
+  display:        flex;
+  flex-direction: column;
+  gap:            5px;
+}
+
+.tscrub-driver--a { padding-right: 16px; }
+.tscrub-driver--b { padding-left:  16px; }
+
+.tscrub-driver-name {
+  font-family:    var(--font-mono);
+  font-size:      9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom:  4px;
+  font-weight:    500;
+}
+.tscrub-driver--a .tscrub-driver-name { color: var(--ver); }
+.tscrub-driver--b .tscrub-driver-name { color: var(--ham); }
+
+.tscrub-row {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     baseline;
+  font-family:     var(--font-mono);
+  font-size:       11px;
+}
+.tscrub-row span:first-child {
+  color:          var(--text3);
+  letter-spacing: 0.06em;
+  font-size:      10px;
+}
+.tscrub-row span:last-child {
+  color: var(--text2);
+}
+

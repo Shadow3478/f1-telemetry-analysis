@@ -244,63 +244,69 @@ function handleExport() {
 // ── TELEMETRY SCRUBBER BINDING ────────────────────────────────────────────
 
 function bindTelemetryScrubber(charts) {
-  const slider = document.getElementById('telemetry-slider');
-  const distEl = document.getElementById('scrubber-distance');
-  const idxEl  = document.getElementById('scrubber-index');
+  const slider  = document.getElementById('telemetry-slider');
+  const distEl  = document.getElementById('scrubber-distance');
+  const idxEl   = document.getElementById('scrubber-index');
+  const resetBtn = document.getElementById('tscrub-reset');
 
   if (!slider) return;
 
-  // Both API and demo generate exactly 1000 aligned telemetry points (0 to 999 indices)
+  // Both API and demo generate exactly 1000 aligned telemetry points (0–999)
   slider.min = '0';
   slider.max = '999';
 
-  // Read distances if available, else approximate a typical 5.2km lap
+  // Read distances if available, else approximate a typical 5.2 km lap
   const distances = (charts && charts.distance) ? charts.distance : null;
   const totalDist = distances ? distances[distances.length - 1] : 5200;
 
-  const handleInput = () => {
-    const idx = parseInt(slider.value, 10);
+  // Update driver name chips so they show the actual driver codes
+  const { selectedDriverA, selectedDriverB } = (window._planEState || {});
+  const nameA = document.getElementById('tscrub-name-a');
+  const nameB = document.getElementById('tscrub-name-b');
+  if (nameA && charts?.driver_a) nameA.textContent = charts.driver_a;
+  if (nameB && charts?.driver_b) nameB.textContent = charts.driver_b;
 
-    // Update readouts
-    if (idxEl) idxEl.textContent = idx;
+  // Helper: set fill gradient & update all readout labels for a given index
+  const updateAtIndex = (idx) => {
+    const pct = ((idx / 999) * 100).toFixed(2) + '%';
+    slider.style.setProperty('--fill-pct', pct);
+
+    if (idxEl)  idxEl.textContent = idx;
     if (distEl) {
       const d = distances ? distances[idx] : idx * (totalDist / 999);
       distEl.textContent = `${d.toFixed(1)} m`;
     }
-    
-    // Update live telemetry readout
+
     if (charts) {
       const el = (id) => document.getElementById(id);
-      if (el('scrubber-delta')) el('scrubber-delta').textContent = charts.delta && charts.delta[idx] !== undefined ? `${charts.delta[idx].toFixed(3)}s` : '0.000s';
-      
-      const spd_a = charts.speed_a ? charts.speed_a[idx] : 0;
-      const thr_a = charts.throttle_a ? charts.throttle_a[idx] : 0;
-      const brk_a = charts.brake_a ? charts.brake_a[idx] : 0;
-      const gear_a = charts.gear_a ? charts.gear_a[idx] : 0;
-      
-      const spd_b = charts.speed_b ? charts.speed_b[idx] : 0;
-      const thr_b = charts.throttle_b ? charts.throttle_b[idx] : 0;
-      const brk_b = charts.brake_b ? charts.brake_b[idx] : 0;
-      const gear_b = charts.gear_b ? charts.gear_b[idx] : 0;
-      
-      console.log(`[Scrubber] currentIndex: ${idx}`);
-      console.log(`[Scrubber] driver_a speed: ${spd_a}, driver_b speed: ${spd_b}`);
-      console.log(`[Scrubber] driver_a throttle: ${thr_a}, driver_b throttle: ${thr_b}`);
-      console.log(`[Scrubber] driver_a brake: ${brk_a}, driver_b brake: ${brk_b}`);
-      console.log(`[Scrubber] driver_a gear: ${gear_a}, driver_b gear: ${gear_b}`);
 
-      if (el('readout-spd-a')) el('readout-spd-a').textContent = `${Math.round(spd_a)} km/h`;
-      if (el('readout-thr-a')) el('readout-thr-a').textContent = `${Math.round(thr_a)} %`;
-      if (el('readout-brk-a')) el('readout-brk-a').textContent = `${Math.round(brk_a * 100)} %`;
+      const delta = charts.delta?.[idx];
+      if (el('scrubber-delta')) {
+        el('scrubber-delta').textContent = delta !== undefined ? `${delta.toFixed(3)}s` : '0.000s';
+      }
+
+      const spd_a  = charts.speed_a?.[idx]    ?? 0;
+      const thr_a  = charts.throttle_a?.[idx] ?? 0;
+      const brk_a  = charts.brake_a?.[idx]    ?? 0;
+      const gear_a = charts.gear_a?.[idx]     ?? '—';
+
+      const spd_b  = charts.speed_b?.[idx]    ?? 0;
+      const thr_b  = charts.throttle_b?.[idx] ?? 0;
+      const brk_b  = charts.brake_b?.[idx]    ?? 0;
+      const gear_b = charts.gear_b?.[idx]     ?? '—';
+
+      if (el('readout-spd-a'))  el('readout-spd-a').textContent  = `${Math.round(spd_a)} km/h`;
+      if (el('readout-thr-a'))  el('readout-thr-a').textContent  = `${Math.round(thr_a)}%`;
+      if (el('readout-brk-a'))  el('readout-brk-a').textContent  = `${Math.round(brk_a * 100)}%`;
       if (el('readout-gear-a')) el('readout-gear-a').textContent = `${gear_a}`;
-      
-      if (el('readout-spd-b')) el('readout-spd-b').textContent = `${Math.round(spd_b)} km/h`;
-      if (el('readout-thr-b')) el('readout-thr-b').textContent = `${Math.round(thr_b)} %`;
-      if (el('readout-brk-b')) el('readout-brk-b').textContent = `${Math.round(brk_b * 100)} %`;
+
+      if (el('readout-spd-b'))  el('readout-spd-b').textContent  = `${Math.round(spd_b)} km/h`;
+      if (el('readout-thr-b'))  el('readout-thr-b').textContent  = `${Math.round(thr_b)}%`;
+      if (el('readout-brk-b'))  el('readout-brk-b').textContent  = `${Math.round(brk_b * 100)}%`;
       if (el('readout-gear-b')) el('readout-gear-b').textContent = `${gear_b}`;
     }
 
-    // Trigger fast 60fps cursor movements on all SVG visual layers
+    // Trigger 60fps cursor movements on all SVG visual layers
     updateTrackDriverPositions(idx);
     updateDeltaChartCursor(idx);
     updateSpeedChartCursor(idx);
@@ -309,16 +315,24 @@ function bindTelemetryScrubber(charts) {
     updateGearChartCursor(idx);
   };
 
-  // Bind listener (remove old one to avoid stale closures)
+  // Bind input listener (remove stale closure from previous run)
   if (slider._pitwallHandler) {
     slider.removeEventListener('input', slider._pitwallHandler);
   }
-  slider._pitwallHandler = handleInput;
-  slider.addEventListener('input', handleInput);
+  slider._pitwallHandler = () => updateAtIndex(parseInt(slider.value, 10));
+  slider.addEventListener('input', slider._pitwallHandler);
+
+  // Wire reset button — snaps slider back to index 0
+  if (resetBtn) {
+    if (resetBtn._pitwallBound) resetBtn.removeEventListener('click', resetBtn._pitwallReset);
+    resetBtn._pitwallReset = () => { slider.value = '0'; updateAtIndex(0); };
+    resetBtn.addEventListener('click', resetBtn._pitwallReset);
+    resetBtn._pitwallBound = true;
+  }
 
   // Trigger initial paint at index 0
   slider.value = '0';
-  handleInput();
+  updateAtIndex(0);
 }
 
 
