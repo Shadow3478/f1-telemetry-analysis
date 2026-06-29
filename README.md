@@ -5,7 +5,6 @@
 
 Instead of just telling you who was faster, this tool compares telemetry lap-by-lap, isolating braking points, corner entry speeds, and throttle applications. Built with a decoupled Python backend and a lightning-fast Vanilla JS frontend, Plan E is designed to crunch heavy F1 datasets asynchronously and visualize the results instantly without locking up your browser. 
 
-![Plan E Landing Page - Diagnose Every Tenth](./assets/landing.png)
 
 ---
 
@@ -87,7 +86,6 @@ Setting up Plan E locally is super straightforward.
 
 ## 🏎️ How It Works: A User's Journey
 
-![Driver Selection Wizard](./assets/driver-selection.png)
 
 1. **Selecting the Combatants:** You start at the Selector page. When you pick a year and race, `pages/selector.js` hits our FastAPI metadata endpoints. Once you pick a session, it fetches the drivers that participated. 
 2. **Submitting the Job:** You click "Run Analysis". The frontend POSTs to `/api/analysis`. The backend immediately returns a `job_id`, and `pages/loading.js` starts a polling loop to track progress. 
@@ -95,7 +93,6 @@ Setting up Plan E locally is super straightforward.
 4. **The Dashboard:** Once the backend marks the job as `COMPLETED`, the frontend transitions to the Analysis view. `pages/analysis.js` takes the massive JSON payload, saves it to the `AppState` singleton (`js/state.js`), and distributes the arrays to components like `deltaChart.js` and `trackMap.js`.
 5. **Scrubbing the Data:** You grab the Telemetry Scrubber at the bottom of the screen. As you drag, `analysis.js` updates the global index (0-999), instantly updating the live speed and gear readouts for both drivers at that exact meter on the track!
 
-![Analysis Dashboard and Telemetry Scrubber](./assets/dashboard.png)
 
 ---
 
